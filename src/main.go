@@ -63,7 +63,7 @@ func main() {
 					srv, rec.Name, rec.Type, rec.Expected, got))
 			}
 
-			time.Sleep(25 * time.Millisecond)
+			time.Sleep(150 * time.Millisecond)
 		}
 	}
 

@@ -62,6 +62,8 @@ func main() {
 				errors = append(errors, fmt.Sprintf("[Server %s] Name: %s (expected %s) | Expected: %s | Got: %s",
 					srv, rec.Name, rec.Type, rec.Expected, got))
 			}
+
+			time.Sleep(25 * time.Millisecond)
 		}
 	}
 
@@ -118,10 +120,8 @@ func normalizeServer(s string) string {
 
 func typeToQtype(t string) (uint16, bool) {
 	switch t {
-	case "A":
+	case "A", "CNAME":
 		return dns.TypeA, true
-	case "CNAME":
-		return dns.TypeCNAME, true
 	case "TXT":
 		return dns.TypeTXT, true
 	case "MX":
@@ -135,7 +135,7 @@ func queryAll(server, name string, qtype uint16) ([]*answer, error) {
 	m.SetQuestion(dns.Fqdn(name), qtype)
 	m.RecursionDesired = true
 
-	c := &dns.Client{Net: "udp", Timeout: 3 * time.Second}
+	c := &dns.Client{Net: "udp", Timeout: 5 * time.Second}
 	resp, _, err := c.Exchange(m, server)
 	if err != nil {
 		return nil, err
@@ -204,21 +204,19 @@ func findMatch(rec Record, answers []*answer) (*answer, bool) {
 }
 
 func describeMismatch(rec Record, answers []*answer) string {
-	// If a different record type was returned (e.g. CNAME where A was expected),
-	// report that as the difference. Otherwise report the first answer of the
-	// expected type, or fall back to the first answer.
+	var diff, same []string
 	for _, ans := range answers {
 		if ans.kind != rec.Type {
-			return fmt.Sprintf("%s -> %s", ans.kind, ans.value)
+			diff = append(diff, fmt.Sprintf("%s -> %s", ans.kind, ans.value))
+		} else {
+			same = append(same, fmt.Sprintf("%s -> %s", ans.kind, ans.value))
 		}
 	}
-	for _, ans := range answers {
-		if ans.kind == rec.Type {
-			return fmt.Sprintf("%s -> %s", ans.kind, ans.value)
-		}
+	if len(diff) > 0 {
+		return strings.Join(diff, ", ")
 	}
-	if len(answers) > 0 {
-		return fmt.Sprintf("%s -> %s", answers[0].kind, answers[0].value)
+	if len(same) > 0 {
+		return strings.Join(same, ", ")
 	}
 	return "<no answers>"
 }

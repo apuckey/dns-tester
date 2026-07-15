@@ -136,7 +136,19 @@ func queryAll(server, name string, qtype uint16) ([]*answer, error) {
 	m.RecursionDesired = true
 
 	c := &dns.Client{Net: "udp", Timeout: 5 * time.Second}
-	resp, _, err := c.Exchange(m, server)
+
+	var resp *dns.Msg
+	var err error
+	for attempt := 1; attempt <= 3; attempt++ {
+		resp, _, err = c.Exchange(m, server)
+		if err == nil {
+			break
+		}
+		if !isTimeout(err) || attempt == 3 {
+			return nil, err
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -156,6 +168,14 @@ func queryAll(server, name string, qtype uint16) ([]*answer, error) {
 		answers = append(answers, a)
 	}
 	return answers, nil
+}
+
+func isTimeout(err error) bool {
+	if err == nil {
+		return false
+	}
+	s := err.Error()
+	return strings.Contains(s, "i/o timeout") || strings.Contains(s, "deadline exceeded")
 }
 
 func parseRR(rr dns.RR) (*answer, error) {
